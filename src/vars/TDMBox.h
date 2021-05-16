@@ -22,14 +22,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// LaserEnvelope.h
+// TDMBox.h
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <config.h>
 
-#ifndef LASERENVELOPE_H
-#define LASERENVELOPE_H
+#ifndef TDMBOX_H
+#define TDMBOX_H
 
 #include <iostream>
 #include <iomanip>
@@ -38,44 +38,42 @@
 
 #include <qball/Sample.h>
 
-class LaserEnvelope : public Var
+class TDMBox : public Var
 {
   Sample *s;
 
   public:
 
-  char const*name ( void ) const { return "laser_envelope"; };
+  char const*name ( void ) const { return "TDMBox"; };
   
   int set ( int argc, char **argv ) {
     if ( argc == 2 ) {
-      s->ctrl.envelope_type = argv[1];
+      int v = atof(argv[1]);
+      s->ctrl.TDM_nr_plot = v;
 
-      if ( s->ctrl.envelope_type != "constant" ){ 
-        ui->error(argv[1]);
-        ui->error("laser_envelope must be [type] [center of envelope] [width of envelope]. type can be: constant, Asin2 or gaussian. ");
-        return 1;
-      }
+      cout << " <WARNING> TDMBox is set only within unit cell </WARNING>" << endl;
     }
 
     else if ( argc == 3 ) { 
-    s->ctrl.envelope_type = argv[1];
-    s->ctrl.envelope_width = atof(argv[2]);
-      if ( s->ctrl.envelope_type != "Asin2" ){ 
-        ui->error(argv[1]);
-        ui->error("laser_envelope must be [type] [width of envelope] [center of envelope]. type can be: constant, Asin2 or gaussian. ");
+      int v = atof(argv[1]);
+      s->ctrl.TDM_nr_plot = v;
+      if(v<1) {
+        ui->error("TDM Box [nr] must be larger than 1");
+        return 1;
+      }
+
+
+      v = atof(argv[2]);
+      s->ctrl.TDM_nR_plot = v;
+      if(v<1) {
+        ui->error("TDM Box [nR] must be larger than 1");
         return 1;
       }
     }
 
-    else if ( argc == 4 ) { 
-    s->ctrl.envelope_type = argv[1];
-    s->ctrl.envelope_width = atof(argv[2]);
-    s->ctrl.envelope_center = atof(argv[3]);
-
-    }
 
     else {
-      ui->error("laser_envelope must be [type] . type can be: constant, Asin2 or gaussian. ");
+      ui->error("TDM Box must be [nr] points in unit cell and [nR] cells");
       return 1;
     }
 
@@ -88,12 +86,12 @@ class LaserEnvelope : public Var
     st.setf(ios::left,ios::adjustfield);
     st << setw(10) << name() << " = ";
     st.setf(ios::right,ios::adjustfield);
-    st << setw(10) << s->ctrl.envelope_type;
-    st << " " << setw(10) <<  s->ctrl.envelope_center << " " << setw(10) << s->ctrl.envelope_width;
+    st << setw(10) << s->ctrl.TDM_nr_plot;
+    st << " in unit cell, and " << setw(10) <<  s->ctrl.TDM_nR_plot << " cells";
     return st.str();
   }
   
-  LaserEnvelope(Sample *sample) : s(sample) { s->ctrl.envelope_type = "constant"; s->ctrl.envelope_center = 0.0 ; s->ctrl.envelope_width = 0.0;}
+  TDMBox(Sample *sample) : s(sample) { s->ctrl.TDM_nr_plot = 2; s->ctrl.TDM_nR_plot = 0 ;}
 
 };
 

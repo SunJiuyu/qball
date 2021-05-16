@@ -22,14 +22,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// LaserEnvelope.h
+// CellMass.h
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <config.h>
 
-#ifndef LASERENVELOPE_H
-#define LASERENVELOPE_H
+#ifndef VECTORPOTENTIAL_IND_H
+#define VECTORPOTENTIAL_IND_H
 
 #include <iostream>
 #include <iomanip>
@@ -38,47 +38,23 @@
 
 #include <qball/Sample.h>
 
-class LaserEnvelope : public Var
+class VectorPotential_ind : public Var
 {
   Sample *s;
 
   public:
 
-  char const*name ( void ) const { return "laser_envelope"; };
+  char const*name ( void ) const { return "vector_potential_induced"; };
   
   int set ( int argc, char **argv ) {
-    if ( argc == 2 ) {
-      s->ctrl.envelope_type = argv[1];
-
-      if ( s->ctrl.envelope_type != "constant" ){ 
-        ui->error(argv[1]);
-        ui->error("laser_envelope must be [type] [center of envelope] [width of envelope]. type can be: constant, Asin2 or gaussian. ");
-        return 1;
-      }
-    }
-
-    else if ( argc == 3 ) { 
-    s->ctrl.envelope_type = argv[1];
-    s->ctrl.envelope_width = atof(argv[2]);
-      if ( s->ctrl.envelope_type != "Asin2" ){ 
-        ui->error(argv[1]);
-        ui->error("laser_envelope must be [type] [width of envelope] [center of envelope]. type can be: constant, Asin2 or gaussian. ");
-        return 1;
-      }
-    }
-
-    else if ( argc == 4 ) { 
-    s->ctrl.envelope_type = argv[1];
-    s->ctrl.envelope_width = atof(argv[2]);
-    s->ctrl.envelope_center = atof(argv[3]);
-
-    }
-
-    else {
-      ui->error("laser_envelope must be [type] . type can be: constant, Asin2 or gaussian. ");
+    if ( argc != 4 ) {
+      ui->error("vector_potential_induced must be specified as a vector with 3 values");
       return 1;
     }
-
+    
+    D3vector v(atof(argv[1]), atof(argv[2]), atof(argv[3]));
+    
+    s->ctrl.initial_vp_ind = v;
     return 0;
   }
   
@@ -88,12 +64,11 @@ class LaserEnvelope : public Var
     st.setf(ios::left,ios::adjustfield);
     st << setw(10) << name() << " = ";
     st.setf(ios::right,ios::adjustfield);
-    st << setw(10) << s->ctrl.envelope_type;
-    st << " " << setw(10) <<  s->ctrl.envelope_center << " " << setw(10) << s->ctrl.envelope_width;
+    st << setw(10) << s->ctrl.initial_vp_ind;
     return st.str();
   }
   
-  LaserEnvelope(Sample *sample) : s(sample) { s->ctrl.envelope_type = "constant"; s->ctrl.envelope_center = 0.0 ; s->ctrl.envelope_width = 0.0;}
+  VectorPotential_ind(Sample *sample) : s(sample) { s->ctrl.initial_vp_ind = D3vector(0.0, 0.0, 0.0); }
 
 };
 

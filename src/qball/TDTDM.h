@@ -19,72 +19,65 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details, in the file COPYING in the
 // root directory of this distribution or <http://www.gnu.org/licenses/>.
-//
 ////////////////////////////////////////////////////////////////////////////////
 //
-// EhrenSampleStepper.h
+// TDTDM.h
 //
 ////////////////////////////////////////////////////////////////////////////////
+// $Id: TDTDM.h, time-dependent transition density matrix-- Jiuyu Aug/2020 $
 
-#include <config.h>
+#ifndef TDTDM_H
+#define TDTDM_H
 
-#ifndef EHRENSAMPLESTEPPER_H
-#define EHRENSAMPLESTEPPER_H
-
-#include "SampleStepper.h"
+#include <vector>
+#include <valarray>
+#include "ChargeDensity.h"
+#include "FourierTransform.h"
+#include "Wavefunction.h"
 #include "EnergyFunctional.h"
 #include "Sample.h"
-#include "Wavefunction.h"
-#include "TDTDM.h"
-#include <ui/PlotCmd.h>
-#include <deque>
-#include "CurrentDensity.h"
-
-class WavefunctionStepper;
-class IonicStepper;
+#include <math/matrix.h>
+#include <math/d3vector.h>
+#include "PrintMem.h"
+#include <math/blas.h>
 using namespace std;
 
-class EhrenSampleStepper : public SampleStepper
+class TDTDM 
 {
   private:
-  
-  Wavefunction dwf;
-//  Wavefunction wf00_;  // for GS wavefuntion storage -- Jiuyu
-  Wavefunction* wfv;
-  deque<Wavefunction*> wfdeque;
-  VectorPotential* tempvp_;
-  TDTDM* tdtdm_;
-  int tdtdm_step_;
-  
-  int nitscf_;
-  int nite_;
-  ChargeDensity cd_;
-  CurrentDensity currd_;
-  EnergyFunctional ef_;
-  
-  WavefunctionStepper* wf_stepper;
-  IonicStepper* ionic_stepper;
 
-  bool tddft_involved_;
-  
-  // Do not allow construction of EhrenSampleStepper unrelated to a Sample
-  EhrenSampleStepper(void);
+  const Wavefunction& wf_;
+  const Sample& s_;
+  //const Basis& basis_;
+
+  VectorPotential * vp;
+
+  vector<double> position_;
+
+
+  bool notGS;
+
 
   public:
 
-  mutable TimerMap tmap;
+  int nr_plot;
+  int nR_plot;
+  valarray<D3vector> r_plot;
+  valarray<D3vector> R_plot;  
   
-  void step(int niter);
-  
-  void get_forces(vector<vector<double> > &f) const;
-  double get_energy(string ename);
-  valarray<double> get_stress(string sname);
+  vector<vector<double> > TranDenMat;
 
-  EhrenSampleStepper(Sample& s, int nitscf, int nite);
-  ~EhrenSampleStepper();
+  vector<vector<complex<double>> > DenMat0; 
+  vector<vector<complex<double>> > DenMat; 
+
+
+  TDTDM (const Sample & s, const Wavefunction & wf, VectorPotential * vparg);
+  ~TDTDM (){
+  }
+
+  void get_TDTDM( Wavefunction & dwf, bool update_TDM);
+  void update_DM( SlaterDet& sd, double wt_ik);
+
 };
-#endif
 
-// Local Variables:
-// mode: c++
-// End:
+#endif

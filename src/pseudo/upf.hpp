@@ -63,6 +63,10 @@ namespace pseudopotential {
 
       return dij_[l*nchannels()*nchannels() + i*nchannels() + j];
     }
+
+    int nchannels_l(int l) const{
+      return nchannels_l_[l];
+    }     
     
     void extrapolate_first_point(std::vector<double> & function_) const{
 
@@ -89,6 +93,7 @@ namespace pseudopotential {
     int llocal_;
     int start_point_;
     int nchannels_;
+    std::vector<int> nchannels_l_;  // old version only supports nchannels=2, while in new oncv.upf nchannels could be l dependent. Not I only modified upf2.
 
     
   };

@@ -69,7 +69,7 @@ using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////
 EhrenSampleStepper::EhrenSampleStepper(Sample& s, int nitscf, int nite) :
-  SampleStepper(s), cd_(s), currd_(s, s.wf), ef_(s,s.wf,cd_),dwf(s.wf), wfv(s.wfv), nitscf_(nitscf),
+  SampleStepper(s), cd_(s),  currd_(s, s.wf), ef_(s,s.wf,cd_),dwf(s.wf), wfv(s.wfv), nitscf_(nitscf),
   nite_(nite)
 {
    const string wf_dyn = s_.ctrl.wf_dyn;
@@ -125,6 +125,7 @@ void EhrenSampleStepper::step(int niter)
    
   AtomSet& atoms = s_.atoms;
   Wavefunction& wf = s_.wf;
+  wf00_ = s_.wf;
   const int nspin = wf.nspin();
   const UnitCell& cell = wf.cell();
   const double dt = s_.ctrl.dt;
@@ -279,6 +280,23 @@ void EhrenSampleStepper::step(int niter)
   QB_Pstart(14,scfloop);
 #endif
   tmap["total_niter"].start();
+
+
+  //yyf: Update vector field and current from where it stops
+    if(ef_.vp && norm(s_.ctrl.laser_amp) > 1e-15) ef_.vp->propagate(s_.ctrl.tddt*(s_.ctrl.mditer-1), s_.ctrl.tddt);
+    if (ef_.vp) ef_.vector_potential_changed(compute_stress);
+    ef_.update_nonlocal_commutator(s_.wf, true);
+    currd_.update_current(ef_,false);
+
+
+  // initilizing and printing the inital TDTDM -- Jiuyu
+  tdtdm_step_ = s_.ctrl.TDM_steps;
+  if (tdtdm_step_ > 1)
+  {
+    tdtdm_ = new TDTDM(s_, s_.wf, ef_.vp);
+    tdtdm_ ->get_TDTDM(s_.wf,  true);
+  }
+
   for ( int iter = 0; iter < niter; iter++ )
   {
 
@@ -358,11 +376,19 @@ void EhrenSampleStepper::step(int niter)
     tmap["efn"].stop();
 
     tmap["current"].start();
+    ef_.update_nonlocal_commutator(s_.wf, true);   
     currd_.update_current(ef_);
     tmap["current"].stop();
 
+  // priting tdtdm every wanted intervals
+  if ( tdtdm_step_ >1 )
+  {
+    if ((iter+1)%tdtdm_step_ ==0) tdtdm_->get_TDTDM(s_.wf,  true);
+  }
+
+
     if(ef_.vp && oncoutpe){
-      std::cout << "<!-- vector_potential: " << ef_.vp->value() << " -->\n";
+      std::cout << "<!-- total_vector_potential: " << ef_.vp->value() << " -->\n";
     }
     
     // average forces over symmetric atoms
@@ -475,6 +501,13 @@ void EhrenSampleStepper::step(int niter)
     }
     tmap["ionic"].stop();
 
+
+       if ( s_.previous_wf == 0 && iter==0)
+       {
+          s_.previous_wf = new Wavefunction(wf);
+          (*s_.previous_wf) = s_.wf;
+       }
+
     if ((s_.previous_wf != 0) && ( s_.ctrl.na_overlap_min < 0 ))
     {
       for ( int ispin = 0; ispin < (wf).nspin(); ispin++ )
@@ -535,8 +568,15 @@ void EhrenSampleStepper::step(int niter)
     wf_stepper->preupdate();
     tmap["preupdate"].stop();
 
-    if(ef_.vp) ef_.vp->propagate(s_.ctrl.tddt*(iter + 1), s_.ctrl.tddt);
-    
+//    if(ef_.vp) ef_.vp->propagate(s_.ctrl.tddt*(iter + 1), s_.ctrl.tddt);
+    if(ef_.vp) ef_.vp->propagate(s_.ctrl.tddt*s_.ctrl.mditer, s_.ctrl.tddt);
+
+    if(ef_.vp && oncoutpe && (iter > niter-3)){
+      std::cout << setprecision(12) << "set vector_potential_induced " << ef_.vp->vp_induced() << "\n";
+      std::cout << setprecision(12) << "set vector_potential_velocity " << ef_.vp->vp_velocity() << "\n"; 
+      std::cout << setprecision(12) << "set vector_potential_accel " << ef_.vp->vp_accel() << "\n"; 	    
+    }
+
     tmap["ionic"].start();
     if ( atoms_move )
     {

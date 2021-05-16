@@ -121,6 +121,17 @@ namespace pseudopotential {
       if(type_ == pseudopotential::type::KLEINMAN_BYLANDER) return 2;
       return 1;
     }
+
+    int nchannels_l(int l) const {
+      if(type_ == pseudopotential::type::ULTRASOFT){
+  int np = nbeta();
+  int nl = lmax() + 1;
+  assert(np%nl == 0);
+  return np/nl;
+      }
+      if(type_ == pseudopotential::type::KLEINMAN_BYLANDER) return 2;
+      return 1;
+    }    
     
     int nquad() const {
       return value<int>(pseudo_node_->first_node("nquad"));

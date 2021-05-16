@@ -244,6 +244,10 @@ namespace pseudopotential {
     int nchannels() const {
       return nchannels_;
     }
+
+    int nchannels_l(int l) const {
+      return nchannels_;
+    }    
     
     double mesh_spacing() const {
       return mesh_spacing_;

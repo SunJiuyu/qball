@@ -46,30 +46,9 @@ public:
     POLARIZATION
   };
 
-  VectorPotential(Dynamics dyn, const D3vector & initial_value, double laser_freq, D3vector laser_amp, string envelope_type, double envelope_center, double envelope_width):
-    dynamics_(dyn),
-    external_(initial_value),
-    laser_freq_(laser_freq),
-    laser_amp_(laser_amp),
-    envelope_type_(envelope_type),
-    envelope_center_(envelope_center),
-    envelope_width_(envelope_width)
-  {
+  VectorPotential(Dynamics dyn, const D3vector & initial_external, const D3vector & initial_induced,const D3vector & initial_velocity, const D3vector & initial_accel, double laser_freq, D3vector laser_amp, string envelope_type, double envelope_center, double envelope_width,double lrc_alpha);
 
-    if(norm(external_) > 1e-15 && norm(laser_amp) > 1e-15) {
-      Messages::fatal("Cannot specify a vector potential and a laser at the same time.");
-    }
-    
-    if(fabs(laser_freq) < -1e-15 && norm(laser_amp) > 1e-15) {
-      Messages::fatal("The laser_freq cannot be zero. Zero is specifically for static electrical field");
-    }
-        
-    induced_ =  D3vector(0.0, 0.0, 0.0);
-    value_ = induced_ + external_;
-    value2_ = norm(value_);
-    velocity_ = D3vector(0.0, 0.0, 0.0);
-    accel_ = D3vector(0.0, 0.0, 0.0);
-  }
+  ~VectorPotential(){}
 
   double * get_kpgpa(const Basis & basis) const {
     const double * kpgpa2 = get_kpgpa2(basis);
@@ -132,44 +111,33 @@ public:
     return value2_;
   }
 
-  void calculate_acceleration(const double & dt, const D3vector& total_current, const UnitCell & cell){
-    //update the velocity to time t - dt/2
-    velocity_ += 0.5*dt*accel_;
-
-    if(dynamics_ == Dynamics::POLARIZATION){
-      accel_ = -4.0*M_PI*total_current/cell.volume();
-    } else {
-      accel_ = D3vector(0.0, 0.0, 0.0);
-    }
-
-    //update the velocity to time t
-    velocity_ += 0.5*dt*accel_;
-  }
-  
-  void propagate(double time, const double & dt){
-    induced_ += dt*velocity_ + 0.5*dt*dt*accel_;
-     
-    // evaluation of analytic form
-    if(norm(laser_amp_) > 0.0 && envelope_type_ == "constant") external_ = -sin(laser_freq_*time)*laser_amp_/laser_freq_;
-
-    // Static external field
-    if(norm(laser_amp_) > 0.0 && envelope_type_ == "constant" && laser_freq_ == 0.0) external_ = -laser_amp_ * time;
-
-    // Numerical integration for guassian d(A/c)/dt = - E = - Amp * Normalization_factor * cos(wt) * Gaussing(center,width)
-    if(norm(laser_amp_) > 0.0 && envelope_type_ == "gaussian") external_ +=  - dt*(laser_amp_/(envelope_width_ * sqrt(M_PI*2.0))) * cos(laser_freq_*time) * exp(-((time-envelope_center_)*(time-envelope_center_))/(2.0*envelope_width_*envelope_width_)) ;
-
-    value_ = induced_ + external_;
-    value2_ = norm(value_);
+  const D3vector & vp_velocity() const {
+    return velocity_;
   }
 
-  
+  const D3vector & vp_induced() const {
+    return induced_;
+  }  
+
+  const D3vector & vp_accel() const {
+    return accel_;
+  }  
+
+  void calculate_acceleration(const double & dt, const D3vector& total_current, const UnitCell & cell);
+
+  void propagate(double time, const double & dt);
+
 private:
   Dynamics dynamics_;
 
+  D3vector initial_external_;
   D3vector external_;
+  D3vector initial_induced_;  
   D3vector induced_;
   D3vector value_;
+  D3vector initial_velocity_;  
   D3vector velocity_;
+  D3vector initial_accel_;
   D3vector accel_;
   double value2_;
 
@@ -178,6 +146,7 @@ private:
   string envelope_type_;
   double envelope_width_;
   double envelope_center_;
+  double lrc_alpha_;
   
 };
 #endif

@@ -160,6 +160,7 @@ void  SpeciesReader::fill_species(Species& sp, pseudopotential::base & pseudo){
   cout << "  <!-- SpeciesReader::readSpecies: read mesh_spacing " << sp.deltar_ << " -->" << endl;
   
   sp.nchannels_ = pseudo.nchannels();
+  sp.nchannels_l_.resize(sp.lmax_+1);
 
   // read the local potential
   if(pseudo.type() == pseudopotential::type::KLEINMAN_BYLANDER){
@@ -169,12 +170,13 @@ void  SpeciesReader::fill_species(Species& sp, pseudopotential::base & pseudo){
     sp.projectors_.resize(sp.lmax_ + 1);
 
     for(int l = 0; l < sp.lmax_ + 1; l++ ) {
+      sp.nchannels_l_[l] = pseudo.nchannels_l(l);
       sp.projectors_[l].resize(sp.nchannels_);
 	  
       for ( int i = 0; i < sp.nchannels_; i++){
 	pseudo.projector(l, i, sp.projectors_[l][i]);
-	cout << "  <!-- SpeciesReader::readSpecies: read projector l="
-	     << l << " i=" << i << " size=" << sp.projectors_[l][i].size() << " -->" << endl;
+//	cout << "  <!-- SpeciesReader::readSpecies: read projector l="
+//	     << l << " i=" << i << " size=" << sp.projectors_[l][i].size() << " -->" << double(sp.projectors_[l][i][1]) << endl;
       }
     }
 
@@ -405,35 +407,46 @@ void SpeciesReader::bcastSpecies(Species& sp)
     if(!ctxt_.oncoutpe()){
       sp.projectors_.resize(sp.lmax_ + 1);
       sp.dij_.resize(sp.lmax_ + 1);
+//      sp.nchannels_l_.resize(sp.lmax_ + 1);  // Jiuyu nchannels
     }
-    
+  // communicate nchannels added
+  if ( ctxt_.oncoutpe() ) {
+    np = sp.nchannels_l_.size();
+    ctxt_.ibcast_send(1, 1, &np, 1);
+    ctxt_.ibcast_send(np, 1, &sp.nchannels_l_[0], np);
+  } else {
+    ctxt_.ibcast_recv(1, 1, &np, 1, irow, icol);
+    sp.nchannels_l_.resize(np);
+    ctxt_.ibcast_recv(np, 1, &sp.nchannels_l_[0], np, irow, icol);
+  }
+      
     for(int ll = 0; ll <= sp.lmax_; ll++ ){
 
       if(!ctxt_.oncoutpe()){
-	sp.projectors_[ll].resize(sp.nchannels_);
-	sp.dij_[ll].resize(sp.nchannels_);
+  sp.projectors_[ll].resize(sp.nchannels_);
+  sp.dij_[ll].resize(sp.nchannels_);
       }
-    
+
       for(int ii = 0; ii < sp.nchannels_; ii++){
 
-	// the projectors
-	if ( ctxt_.oncoutpe() ) {
-	  np = sp.projectors_[ll][ii].size();
-	  ctxt_.ibcast_send(1, 1, &np, 1);
-	  ctxt_.dbcast_send(np, 1, &sp.projectors_[ll][ii][0], np);
-	} else {
-	  ctxt_.ibcast_recv(1, 1, &np, 1, irow, icol);
-	  sp.projectors_[ll][ii].resize(np);
-	  ctxt_.dbcast_recv(np, 1, &sp.projectors_[ll][ii][0], np, irow, icol);
-	}
+  // the projectors
+  if ( ctxt_.oncoutpe() ) {
+    np = sp.projectors_[ll][ii].size();
+    ctxt_.ibcast_send(1, 1, &np, 1);
+    ctxt_.dbcast_send(np, 1, &sp.projectors_[ll][ii][0], np);
+  } else {
+    ctxt_.ibcast_recv(1, 1, &np, 1, irow, icol);
+    sp.projectors_[ll][ii].resize(np);
+    ctxt_.dbcast_recv(np, 1, &sp.projectors_[ll][ii][0], np, irow, icol);
+  }
 
-	// the weights
-	if ( ctxt_.oncoutpe() ) {
-	  ctxt_.dbcast_send(sp.nchannels_, 1, &sp.dij_[ll][ii][0], sp.nchannels_);
-	} else {
-	  sp.dij_[ll][ii].resize(sp.nchannels_);
-	  ctxt_.dbcast_recv(sp.nchannels_, 1, &sp.dij_[ll][ii][0], sp.nchannels_, irow, icol);
-	}
+  // the weights
+  if ( ctxt_.oncoutpe() ) {
+    ctxt_.dbcast_send(sp.nchannels_, 1, &sp.dij_[ll][ii][0], sp.nchannels_);
+  } else {
+    sp.dij_[ll][ii].resize(sp.nchannels_);
+    ctxt_.dbcast_recv(sp.nchannels_, 1, &sp.dij_[ll][ii][0], sp.nchannels_, irow, icol);
+  }
 
       }
     }

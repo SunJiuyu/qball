@@ -41,6 +41,7 @@
 #include "SelfConsistentPotential.h"
 #include "Timer.h"
 #include "VectorPotential.h"
+#include <math/d3vector.h>
 using namespace std;
 
 class Sample;
@@ -97,6 +98,8 @@ class EnergyFunctional
   
   valarray<double> sigma_ekin,sigma_econf,sigma_eps,sigma_ehart,sigma_exc, sigma_vdw,
     sigma_enl, sigma_esr, sigma;
+  D3vector psp_current_;
+
 
   public:
 
@@ -141,7 +144,10 @@ class EnergyFunctional
   void update_exc_ehart_eps(void);
   // AS: update the Hamiltonian in the case of TDDFT (i.e. selfconsistent) time propagation
   void update_hamiltonian(void);
+  void update_nonlocal_commutator(Wavefunction& psi, bool compute_rVnl);
+  D3vector  psp_current(void) const{ return psp_current_;}
   
+
   void atoms_moved(void);
   void cell_moved(const bool compute_stress);
   void vector_potential_changed(const bool compute_stress);

@@ -85,6 +85,7 @@ class Species {
   // oncv specific
   bool oncv_;            // true for oncv pseudos
   int nchannels_;        // number of channels, for the moment we assume this is always 2 (1 for other pseudos)
+  vector<int> nchannels_l_;  // l dependent nchannels by Jiuyu
   vector<vector<vector<double> > > projectors_;  // projectors for each l and channel
   vector<double> vloc_;  // local potential for oncv
   vector<vector<vector<double> > > dij_; // the weight matrix
@@ -195,6 +196,7 @@ class Species {
   bool ultrasoft(void) { return usoft_; }
   bool nlcc(void) { return nlcc_; }
   int nchannels() const { return nchannels_; }
+  int nchannels_l(int l) const { return nchannels_l_[l]; }  
   const vector<vector<double> >& vps(void) const { return vps_; }
   const vector<vector<double> >& phi(void) const { return phi_; }
   

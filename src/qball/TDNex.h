@@ -19,72 +19,60 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details, in the file COPYING in the
 // root directory of this distribution or <http://www.gnu.org/licenses/>.
-//
 ////////////////////////////////////////////////////////////////////////////////
 //
-// EhrenSampleStepper.h
+// TDTDM.h
 //
 ////////////////////////////////////////////////////////////////////////////////
+// $Id: TDTDM.h, time-dependent number of excited electrons -- Jiuyu Jan/2021 $
 
-#include <config.h>
+#ifndef TDNEX_H
+#define TDNEX_H
 
-#ifndef EHRENSAMPLESTEPPER_H
-#define EHRENSAMPLESTEPPER_H
-
-#include "SampleStepper.h"
+#include <vector>
+#include <valarray>
+#include "ChargeDensity.h"
+#include "FourierTransform.h"
+#include "Wavefunction.h"
 #include "EnergyFunctional.h"
 #include "Sample.h"
-#include "Wavefunction.h"
-#include "TDTDM.h"
-#include <ui/PlotCmd.h>
-#include <deque>
-#include "CurrentDensity.h"
-
-class WavefunctionStepper;
-class IonicStepper;
+#include <math/matrix.h>
+#include <math/d3vector.h>
+#include "PrintMem.h"
+#include <math/blas.h>
 using namespace std;
 
-class EhrenSampleStepper : public SampleStepper
+class TDNEX 
 {
   private:
-  
-  Wavefunction dwf;
-//  Wavefunction wf00_;  // for GS wavefuntion storage -- Jiuyu
-  Wavefunction* wfv;
-  deque<Wavefunction*> wfdeque;
-  VectorPotential* tempvp_;
-  TDTDM* tdtdm_;
-  int tdtdm_step_;
-  
-  int nitscf_;
-  int nite_;
-  ChargeDensity cd_;
-  CurrentDensity currd_;
-  EnergyFunctional ef_;
-  
-  WavefunctionStepper* wf_stepper;
-  IonicStepper* ionic_stepper;
 
-  bool tddft_involved_;
-  
-  // Do not allow construction of EhrenSampleStepper unrelated to a Sample
-  EhrenSampleStepper(void);
+  const Wavefunction& wf_;
+  const Wavefunction wf00_; // for GS wavefuntion storage -- Jiuyu
+  const Sample& s_;
+  //const Basis& basis_;
+
+  VectorPotential * vp;
+
+
+  bool notGS;
+
 
   public:
 
-  mutable TimerMap tmap;
   
-  void step(int niter);
-  
-  void get_forces(vector<vector<double> > &f) const;
-  double get_energy(string ename);
-  valarray<double> get_stress(string sname);
+  vector<vector<double> > TranDenMat;
 
-  EhrenSampleStepper(Sample& s, int nitscf, int nite);
-  ~EhrenSampleStepper();
+  vector<vector<complex<double>> > proj_mat; 
+  vector<vector<complex<double>> > num_exc_ele; 
+
+
+  TDNEX (const Sample & s, const Wavefunction & wf, VectorPotential * vparg);
+  ~TDNEX (){
+  }
+
+  void get_TDNEX( Wavefunction & dwf, bool update_TDM);
+  void update_projM( SlaterDet& sd, double wt_ik); // update project matrix
+
 };
-#endif
 
-// Local Variables:
-// mode: c++
-// End:
+#endif

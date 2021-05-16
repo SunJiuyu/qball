@@ -41,14 +41,16 @@ XCPotential::XCPotential(ChargeDensity& cd, const string functional_name):
     cd_ecalc_(cd)
 {
    tddft_involved_ = false;
+   xc0_stored_ = true;
    initialize(functional_name);
 }
 ////////////////////////////////////////////////////////////////////////////////
 // separate constructor for TDDFT runs
-XCPotential::XCPotential(ChargeDensity& cd, const string functional_name, ChargeDensity& cd_ecalc):
-  cd_(cd), ctxt_(cd.vcontext()), vft_(*cd_.vft()), vbasis_(*cd_.vbasis()), cd_ecalc_(cd_ecalc)
+XCPotential::XCPotential(ChargeDensity& cd, const string functional_name, ChargeDensity& cd_ecalc , const double beta_alda):
+  cd_(cd), ctxt_(cd.vcontext()), vft_(*cd_.vft()), vbasis_(*cd_.vbasis()), cd_ecalc_(cd_ecalc), beta_alda_(beta_alda)
 {
    tddft_involved_ = true;
+   xc0_stored_ = false;
    initialize(functional_name);
 }
 
@@ -154,9 +156,46 @@ void XCPotential::update(vector<vector<double> >& vr)
        else
           rh = (double*)xcf_->rho;
       const double *const v = xcf_->vxc1;
-      for ( int i = 0; i < size; i++ ) {
-        exc_ += rh[i] * e[i];
-        vr[0][i] += v[i];
+
+      if (!tddft_involved_){
+        for ( int i = 0; i < size; i++ ) {
+          exc_ += rh[i] * e[i];
+          vr[0][i] += v[i];
+        }
+      }
+      else{
+//       cout << "storing vxc0\"" << xc0_stored_ << "\">\n";      
+      if(!xc0_stored_){
+//       cout << "storing vxc0\"" << "\">\n";
+
+        exc0_ = 0.0;
+        for ( int i = 0; i < size; i++ ) {
+          exc0_ += rh[i] * e[i];
+          exc_ += rh[i] * e[i];
+          vxc0[0][i] += v[i];
+          vr[0][i] += v[i];
+        }        
+        xc0_stored_ = true;
+      }
+      else{
+        if( beta_alda_ == 1.0) {
+          for ( int i = 0; i < size; i++ ) {
+            exc_ += rh[i] * e[i];
+            vr[0][i] += v[i];
+          }
+        }
+        else{
+          for ( int i = 0; i < size; i++ ) {
+            exc_ += rh[i] * e[i];
+            vr[0][i] += v[i]; }
+            exc_ = beta_alda_*(exc_-exc0_)+exc0_;
+      	  //  exc_ = exc0_;
+      	  for (int i = 0; i < size; i++) {
+      	    vr[0][i] = beta_alda_*(vr[0][i]-vxc0[0][i])+vxc0[0][i];
+      	  //  vr[0][i] = vxc0[0][i];
+      	  }
+        }
+      }
       }
     }
     else {

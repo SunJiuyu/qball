@@ -101,6 +101,7 @@ namespace pseudopotential {
     virtual int valence_charge() const = 0;
     virtual int llocal() const = 0;
     virtual int nchannels() const = 0;
+    virtual int nchannels_l(int l) const = 0;
     virtual double mesh_spacing() const = 0;
     virtual int mesh_size() const = 0;
     virtual void local_potential(std::vector<double> & potential) const = 0;

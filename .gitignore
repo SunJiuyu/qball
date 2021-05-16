@@ -12,3 +12,8 @@ missing
 src/Makefile.in
 testsuite/Makefile.in
 *~
+
+src/.DS_Store
+src/*/.DS_Store
+*.o
+*.a

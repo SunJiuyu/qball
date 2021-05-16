@@ -22,69 +22,67 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// EhrenSampleStepper.h
+// TDMSTeps.h
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <config.h>
 
-#ifndef EHRENSAMPLESTEPPER_H
-#define EHRENSAMPLESTEPPER_H
+#ifndef TDMSTEPS_H
+#define TDMSTEPS_H
 
-#include "SampleStepper.h"
-#include "EnergyFunctional.h"
-#include "Sample.h"
-#include "Wavefunction.h"
-#include "TDTDM.h"
-#include <ui/PlotCmd.h>
-#include <deque>
-#include "CurrentDensity.h"
 
-class WavefunctionStepper;
-class IonicStepper;
-using namespace std;
+#include<iostream>
+#include<iomanip>
+#include<sstream>
+#include<stdlib.h>
 
-class EhrenSampleStepper : public SampleStepper
+#include <qball/Sample.h>
+
+class TDMSteps : public Var
 {
-  private:
-  
-  Wavefunction dwf;
-//  Wavefunction wf00_;  // for GS wavefuntion storage -- Jiuyu
-  Wavefunction* wfv;
-  deque<Wavefunction*> wfdeque;
-  VectorPotential* tempvp_;
-  TDTDM* tdtdm_;
-  int tdtdm_step_;
-  
-  int nitscf_;
-  int nite_;
-  ChargeDensity cd_;
-  CurrentDensity currd_;
-  EnergyFunctional ef_;
-  
-  WavefunctionStepper* wf_stepper;
-  IonicStepper* ionic_stepper;
-
-  bool tddft_involved_;
-  
-  // Do not allow construction of EhrenSampleStepper unrelated to a Sample
-  EhrenSampleStepper(void);
+  Sample *s;
 
   public:
 
-  mutable TimerMap tmap;
-  
-  void step(int niter);
-  
-  void get_forces(vector<vector<double> > &f) const;
-  double get_energy(string ename);
-  valarray<double> get_stress(string sname);
+  char const*name ( void ) const { return "TDM_steps"; };
 
-  EhrenSampleStepper(Sample& s, int nitscf, int nite);
-  ~EhrenSampleStepper();
+  int set ( int argc, char **argv )
+  {
+    if ( argc != 2 )
+    {
+      if ( ui->oncoutpe() )
+      cout << " <ERROR> TDM_steps takes only one value </ERROR>" << endl;
+      return 1;
+    }
+    
+    int v = atof(argv[1]);
+    if ( v < 1 )
+    {
+      if ( ui->oncoutpe() )
+        cout << " <ERROR> TDM_steps must be larger than 1 </ERROR>" << endl;
+      return 1;
+    }
+
+    s->ctrl.TDM_steps = v;
+    return 0;
+  }
+
+  string print (void) const
+  {
+     ostringstream st;
+     st.setf(ios::left,ios::adjustfield);
+     st << setw(10) << name() << " = ";
+     st.setf(ios::right,ios::adjustfield);
+     st << setw(10) << s->ctrl.TDM_steps;
+     return st.str();
+  }
+
+  TDMSteps(Sample *sample) : s(sample) { s->ctrl.TDM_steps = 0; }
 };
 #endif
 
 // Local Variables:
 // mode: c++
 // End:
+

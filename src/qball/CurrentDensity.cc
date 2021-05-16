@@ -39,29 +39,45 @@ CurrentDensity::CurrentDensity(const Sample& s, const Wavefunction & wf):
 void CurrentDensity::update_current(EnergyFunctional & energy_functional, bool output){
 
   Wavefunction rwf(wf_);
-  Wavefunction rdwf(wf_);
-  Wavefunction drwf(wf_);
+//  Wavefunction rdwf(wf_);
+//  Wavefunction drwf(wf_);
 
   std::vector<std::vector<double> > fion;
   std::valarray<double> sigma;
   std::vector<std::complex<double> > tmp(vft()->np012loc(), 0.0);
 
+  std::vector<D3vector> total_current_k;
+  std::vector<std::vector<std::vector<double> > > current_k;
+
   current.resize(3);
+  current_k.resize(3);
+  total_current_k.resize(wf_.nkp());
   double volume_element = vbasis()->cell().volume()/vft()->np012();
+
 
   for(int idir = 0; idir < 3; idir++){
 
+
     current[idir].resize(wf_.nspin());
+
+
+    current_k[idir].resize(wf_.nkp());
     total_current[idir] = 0.0;
 
     for ( int ispin = 0; ispin < wf_.nspin(); ispin++){
       current[idir][ispin].resize(vft()->np012loc());
 
       for(int ip = 0; ip < vft()->np012loc(); ip++){
-	current[idir][ispin][ip] = 0.0;
+		current[idir][ispin][ip] = 0.0;
       }
 
       for ( int ikp = 0; ikp < wf_.nkp(); ikp++ ){
+
+      current_k[idir][ikp].resize(vft()->np012loc());
+      for(int ip = 0; ip < vft()->np012loc(); ip++){
+		current_k[idir][ikp][ip] = 0.0;
+      }
+
 
 	const int ngwloc = wf_.sd(ispin, ikp)->basis().localsize();
 	const int mloc = wf_.sd(ispin, ikp)->c().mloc();
@@ -83,18 +99,35 @@ void CurrentDensity::update_current(EnergyFunctional & energy_functional, bool o
 	
 	for(int ip = 0; ip < vft()->np012loc(); ip++){
 	  current[idir][ispin][ip] += -std::imag(tmp[ip]);
+	  current_k[idir][ikp][ip] += -std::imag(tmp[ip]);
 	}
       }
 
       wf_.wfcontext()->dsum('r', vft()->np012loc(), 1, &current[idir][ispin][0], vft()->np012loc());
+
+      for(int ikp=0; ikp < wf_.nkp(); ikp++){
+      wf_.wfcontext()->dsum('r', vft()->np012loc(), 1, &current_k[idir][ikp][0], vft()->np012loc());
+  		}
+
       
       for(int ip = 0; ip < vft()->np012loc(); ip++){
 	total_current[idir] += volume_element*current[idir][ispin][ip];
+	    for(int ikp=0; ikp < wf_.nkp(); ikp++){
+      total_current_k[ikp][idir] += volume_element*current_k[idir][ikp][ip];
+  		}
+
       }
 
       wf_.spincontext(ispin)->dsum('c', 1, 1, &total_current[idir], 1);
+      for(int ikp=0; ikp < wf_.nkp(); ikp++){
+      	wf_.spincontext(ispin)->dsum('c', 1, 1, &total_current_k[ikp][idir], 1);
 
-      if(energy_functional.vp) total_current[idir] += energy_functional.vp->value()[idir]*energy_functional.hamil_cd()->nelectrons();
+      total_current_k[ikp][idir] += energy_functional.vp->value()[idir]*energy_functional.hamil_cd()->nelectrons();
+  	  }
+
+
+      if(energy_functional.vp) total_current[idir] += energy_functional.vp->value()[idir]*energy_functional.hamil_cd()->nelectrons() - energy_functional.psp_current()[idir];
+
       
     }
     
@@ -106,6 +139,12 @@ void CurrentDensity::update_current(EnergyFunctional & energy_functional, bool o
   if ( wf_.context().onpe0() ){
     if (output)
       std::cout << "  total_electronic_current:\t" << std::fixed << std::setw( 20 ) << std::setprecision( 12 ) << total_current[0] << '\t' << total_current[1] << '\t' << total_current[2] << std::endl;
+
+
+      for(int ikp=0; ikp < wf_.nkp(); ikp++){
+      std::cout << "  total_current_k:\t" << std::fixed << std::setw( 20 ) << std::setprecision( 12 ) << total_current_k[ikp][0] << '\t' << total_current_k[ikp][1] << '\t' << total_current_k[ikp][2] << std::endl;
+  	  }
+
   }
 
 }

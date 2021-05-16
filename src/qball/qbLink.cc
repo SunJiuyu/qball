@@ -135,6 +135,10 @@ using namespace std;
 #include <vars/ThTemp.h>
 #include <vars/ThTime.h>
 #include <vars/ThWidth.h>
+#include <vars/TDMBox.h>
+#include <vars/TDMSteps.h>
+#include <vars/LRC_alpha.h>
+#include <vars/LRC_alda.h>
 #include <vars/CenterOfMass.h>
 #include <vars/WfDiag.h>
 #include <vars/WfDyn.h>
@@ -163,7 +167,10 @@ using namespace std;
 #include <vars/EsmBC.h>
 #include <vars/EsmW.h>
 #include <vars/VectorPotentialDynamics.h>
-#include <vars/VectorPotentialVar.h>
+#include <vars/VectorPotential_ext.h>
+#include <vars/VectorPotential_ind.h>
+#include <vars/VectorPotential_v.h>
+#include <vars/VectorPotential_acc.h>
 #include <vars/LaserFreq.h>
 #include <vars/LaserAmp.h>
 #include <vars/LaserEnvelope.h>
@@ -399,6 +406,8 @@ void qbLink::init(void) {
   ui->addVar(new ThTemp(s));
   ui->addVar(new ThTime(s));
   ui->addVar(new ThWidth(s));
+  ui->addVar(new LRC_alpha(s));
+  ui->addVar(new LRC_alda(s));
   ui->addVar(new CenterOfMass(s));
   ui->addVar(new WfDiag(s));
   ui->addVar(new WfDyn(s));
@@ -421,6 +430,8 @@ void qbLink::init(void) {
   ui->addVar(new Force_Complex_WF(s));
   ui->addVar(new Non_Selfconsistent_Energy_Output(s));
   ui->addVar(new TDDt(s));
+  ui->addVar(new TDMBox(s));
+  ui->addVar(new TDMSteps(s));
   ui->addVar(new NA_overlaps(s));
   ui->addVar(new WF_Phase_RealVar(s));
   ui->addVar(new SaveFreq(s));
@@ -430,7 +441,10 @@ void qbLink::init(void) {
   ui->addVar(new EsmBC(s));
   ui->addVar(new EsmW(s));
   ui->addVar(new VectorPotentialDynamics(s));
-  ui->addVar(new VectorPotentialVar(s));
+  ui->addVar(new VectorPotential_ext(s));
+  ui->addVar(new VectorPotential_ind(s));
+  ui->addVar(new VectorPotential_v(s));
+  ui->addVar(new VectorPotential_acc(s)); 
   ui->addVar(new LaserFreq(s));
   ui->addVar(new LaserAmp(s));
   ui->addVar(new LaserEnvelope(s));

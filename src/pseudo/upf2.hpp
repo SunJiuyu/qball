@@ -136,6 +136,12 @@ namespace pseudopotential {
 
       }
 
+    // here Jiuyu do nchannels_l
+    nchannels_l_.resize(lmax_+1);
+    for(int iproj=0; iproj<nprojectors(); iproj++){
+        nchannels_l_[proj_l[iproj]] = proj_c[iproj] + 1;
+    }
+
       assert(lmax_ >= 0);
       
       llocal_ = -1;
@@ -144,30 +150,30 @@ namespace pseudopotential {
       //Read dij once
       {
 
-      	rapidxml::xml_node<> * node = root_node_->first_node("PP_NONLOCAL")->first_node("PP_DIJ");
+        rapidxml::xml_node<> * node = root_node_->first_node("PP_NONLOCAL")->first_node("PP_DIJ");
 
-	assert(node);
+  assert(node);
 
-	dij_.resize((lmax_ + 1)*nchannels_*nchannels_);
-	
-	for(unsigned kk = 0; kk < dij_.size(); kk++) dij_[kk] = 0.0;
-	
-	std::istringstream stst(node->value());
-	for(int ii = 0; ii < nprojectors(); ii++){
-	  for(int jj = 0; jj < nprojectors(); jj++){
-	    double val;
-	    stst >> val;
+  dij_.resize((lmax_ + 1)*nchannels_*nchannels_);
+  
+  for(unsigned kk = 0; kk < dij_.size(); kk++) dij_[kk] = 0.0;
+  
+  std::istringstream stst(node->value());
+  for(int ii = 0; ii < nprojectors(); ii++){
+    for(int jj = 0; jj < nprojectors(); jj++){
+      double val;
+      stst >> val;
 
-	    if(proj_l[ii] != proj_l[jj]) {
-	      assert(fabs(val) < 1.0e-10);
-	      continue;
-	    }
-	    
-	    val *= 0.5; //convert from Rydberg to Hartree
-	    d_ij(proj_l[ii], proj_c[ii], proj_c[jj]) = val;
-	  }
-	}
-	
+      if(proj_l[ii] != proj_l[jj]) {
+        assert(fabs(val) < 1.0e-10);
+        continue;
+      }
+      
+      val *= 0.5; //convert from Rydberg to Hartree
+      d_ij(proj_l[ii], proj_c[ii], proj_c[jj]) = val;
+    }
+  }
+  
       }
 
     }

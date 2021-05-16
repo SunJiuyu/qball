@@ -99,6 +99,8 @@ void NonLocalPotential::init(const bool compute_stress) {
   wquad.resize(nsp);
    
   nspnl = 0;
+  pp_kbv_dim=0;
+  lmax_global=0;
   ultrasoft_ = false;
   for ( int is = 0; is < nsp; is++ ) {
     Species *s = atoms_.species_list[is];
@@ -111,6 +113,7 @@ void NonLocalPotential::init(const bool compute_stress) {
     if ( s->non_local() && !s->ultrasoft()) {
       nspnl++;
       lmax[is] = s->lmax();
+      if(lmax_global< lmax[is]) lmax_global = lmax[is];
       lloc[is] = s->llocal();
       nquad[is] = s->nquad();
       
@@ -124,6 +127,7 @@ void NonLocalPotential::init(const bool compute_stress) {
         npr[is] = s->nlm() * nquad[is];
       }
       nprna[is] = npr[is] * na[is];
+      pp_kbv_dim += nprna[is];
       
       // l value for projector ipr
       lproj[is].resize(npr[is]);
@@ -214,6 +218,7 @@ void NonLocalPotential::init(const bool compute_stress) {
 	  iprojlm[is][l].resize(2*l + 1);
 	  for ( int m = 0; m < 2*l+1; m++ ) {
 	    iprojlm[is][l][m].resize(s->nchannels());
+            if ( nquad[is] == 0 ) iprojlm[is][l][m].resize(s->nchannels_l(l));
 	  }
 	  
           if ( nquad[is] == 0 ) {
@@ -249,9 +254,13 @@ void NonLocalPotential::init(const bool compute_stress) {
           }
         }
       }
+//      cout << (s->nchannels_l(1)) << "npr:  " << npr[is] << endl;
       assert(ipr_base==npr[is]);
     } // if s->non_local()
   }
+
+//  if(ctxt_.mype()==0) cout << "pp_kbv_dim: " << pp_kbv_dim << endl; 
+  pp_dim_checked = false;
 
   highmem_ = false;
 
@@ -305,7 +314,7 @@ void NonLocalPotential::update_twnl(const bool compute_stress) {
         if ( l != lloc[is] ) {
           if ( l == 0 ) {
             if ( nquad[is] == 0 ) {
-	      for(int ic = 0; ic < s->nchannels(); ic++){
+	      for(int ic = 0; ic < s->nchannels_l(l); ic++){
 		// Kleinman-Bylander
 		
 		// twnl[is][ipr][ig]
@@ -416,7 +425,7 @@ void NonLocalPotential::update_twnl(const bool compute_stress) {
           }
           else if ( l == 1 ) {
             if ( nquad[is] == 0 ) {
-	      for(int ic = 0; ic < s->nchannels(); ic++){
+	      for(int ic = 0; ic < s->nchannels_l(l); ic++){
 		// Kleinman-Bylander
 		
 		// twnl[is][ipr][ig]
@@ -626,7 +635,7 @@ void NonLocalPotential::update_twnl(const bool compute_stress) {
           }
           else if ( l == 2 ) {
             if ( nquad[is] == 0 ) {
-	      for(int ic = 0; ic < s->nchannels(); ic++){
+	      for(int ic = 0; ic < s->nchannels_l(l); ic++){
 		// Kleinman-Bylander
 		const int ipr4 = iprojlm[is][l][0][ic];
 		const int ipr5 = iprojlm[is][l][1][ic];
@@ -981,7 +990,7 @@ void NonLocalPotential::update_twnl(const bool compute_stress) {
           }
           else if ( l == 3 ) {
             if ( nquad[is] == 0 ) {
-	      for(int ic = 0; ic < s->nchannels(); ic++){
+	      for(int ic = 0; ic < s->nchannels_l(l); ic++){
               // Kleinman-Bylander
 		const int ipr9  = iprojlm[is][l][0][ic];
 		const int ipr10 = iprojlm[is][l][1][ic];
@@ -2802,4 +2811,397 @@ void NonLocalPotential::print_memory(ostream& os, int kmult, int kmultloc, doubl
     os << "<!-- memory nlp.twnl    :  " << setw(7) << twnl_size << twnl_unit << "  (" << twnl_locsize << twnl_locunit << " local) -->" << endl;
   }
 }
-  
+ 
+
+  int NonLocalPotential::mindx(int tl, int tm)
+  {
+    int mm = tm;
+    if(tl != 0) mm=tm+tl;
+    return mm;
+  }
+
+void NonLocalPotential::pp_kb_ylm(double gx, double gy, double gz)
+{
+
+  const double pi = M_PI;
+  const double fpi = 4.0 * pi;
+  const complex<double> cI = {0.0,1.0};
+  const complex<double> cZERO = {0.0,0.0};
+
+  double  costh,sinth,cosphi,sinphi,ch,kmod,kxymod,local_err;
+  complex<double>  eiphi;
+
+  kb_Ylm_.resize(lmax_global+1);
+  for ( int l = 0; l < lmax_global+1; l++ )
+  {
+    kb_Ylm_[l].resize(2*lmax_global+1);
+    for( int im=0; im< 2*lmax_global+1; im++) kb_Ylm_[l][im]=cZERO;
+  }
+
+  kb_dYlm_.resize(2);
+  kb_dYlm_[0].resize(lmax_global+1);
+  kb_dYlm_[1].resize(lmax_global+1);
+  for ( int l = 0; l < lmax_global+1; l++ )
+  {
+    kb_dYlm_[0][l].resize(2*lmax_global+1);
+    kb_dYlm_[1][l].resize(2*lmax_global+1);
+    for( int im=0; im< 2*lmax_global+1; im++) {
+      kb_dYlm_[0][l][im]=cZERO;
+      kb_dYlm_[1][l][im]=cZERO;
+    }
+  }
+  kb_Ylm_grad_.resize(2);
+  kb_Ylm_grad_[0].resize(3);
+  kb_Ylm_grad_[1].resize(3);
+  for( int im=0; im< 3; im++) {
+    kb_Ylm_grad_[0][im]=0.0;
+    kb_Ylm_grad_[1][im]=0.0;
+  }
+
+
+//
+  local_err=1.E-6;
+  //
+  kmod=sqrt(gx*gx+gy*gy+gz*gz);
+  if (kmod<local_err) return;
+  // just borrowed from Yambo  --Jiuyu 5/12/2020
+  // This is a way to handle the z axis
+  // Since phi is not defined there we use an axis which is
+  // almost z, just shifte by local_err
+  kxymod=sqrt(gx*gx+gy*gy);
+  if(kxymod<local_err) {
+    gx=local_err;
+    gy=0.0;
+    kxymod=local_err;
+  }
+  //
+  costh= gz/kmod;
+  sinth=kxymod/kmod;
+  //
+  cosphi=gx/kxymod;
+  sinphi=gy/kxymod;
+//  eiphi = (cosphi, sinphi);
+//  cout << "eiphi " <<  cosphi <<  sinphi << " " << real(eiphi) << " " << imag(eiphi) << endl;
+  eiphi.real(cosphi);
+  eiphi.imag(sinphi);
+//  cout << "eiphi " <<  cosphi <<  sinphi << " " << real(eiphi) << " " << imag(eiphi) << endl;
+
+ kb_Ylm_grad_[0][0]= gz*cosphi/(kmod*kmod);
+ kb_Ylm_grad_[0][1]= gz*sinphi/(kmod*kmod);
+ kb_Ylm_grad_[0][2]=  -kxymod/(kmod*kmod);
+ //
+ kb_Ylm_grad_[1][0]=-sinphi /kxymod;
+ kb_Ylm_grad_[1][1]= cosphi /kxymod;
+ kb_Ylm_grad_[1][2]= 0.0;
+ //
+ kb_Ylm_[0][0]=1.0/sqrt(fpi);
+ kb_dYlm_[0][0][0]=cZERO;
+ kb_dYlm_[1][0][0]=cZERO;
+ if (lmax_global == 0) return;
+ //
+ ch=sqrt(3.0/(fpi));
+ kb_Ylm_[1][mindx(1,0)]= ch*costh;
+ kb_dYlm_[0][1][mindx(1,0)]=-ch*sinth;
+ kb_dYlm_[1][1][mindx(1,0)]= cZERO;
+ ch=sqrt(3.0/(8.0*pi));
+ kb_Ylm_[1][mindx(1,1)]=-ch*sinth*eiphi;
+ kb_dYlm_[0][1][mindx(1,1)]=-ch*costh*eiphi;
+ kb_dYlm_[1][1][mindx(1,1)]=-ch*sinth*eiphi*cI;
+ // M < 0
+ kb_Ylm_[1][mindx(1,-1)]=-conj(kb_Ylm_[1][mindx(1,1)]);
+ for(int im=0; im<2; im++) kb_dYlm_[im][1][mindx(1,-1)]=-conj(kb_dYlm_[im][1][mindx(1,1)]);
+ if(lmax_global == 1) return;
+ //
+ ch=sqrt(5.0/(16.0*pi));
+ kb_Ylm_[2][mindx(2,0)]= ch*(3.0*costh*costh-1.0);
+ kb_dYlm_[0][2][mindx(2,0)]=-ch*costh*sinth*6.0;
+ kb_dYlm_[1][2][mindx(2,0)]= cZERO;
+ ch=sqrt(15.0/(8.0*pi));
+ kb_Ylm_[2][mindx(2,1)]=-ch*sinth*costh*eiphi;
+ kb_dYlm_[0][2][mindx(2,1)]=-ch*(costh*costh-sinth*sinth)*eiphi;
+ kb_dYlm_[1][2][mindx(2,1)]=-ch*sinth*costh*eiphi*cI;
+ ch=sqrt(15.0/(32.0*pi));
+ kb_Ylm_[2][mindx(2,2)]= ch*(sinth*sinth)*pow(eiphi,2);
+ kb_dYlm_[0][2][mindx(2,2)]= ch*2.0*costh*sinth*eiphi*eiphi;
+ kb_dYlm_[1][2][mindx(2,2)]= ch*2.0*sinth*sinth*eiphi*eiphi*cI;
+ // M < 0
+ kb_Ylm_[2][mindx(2,-1)]=-conj(kb_Ylm_[2][mindx(2,1)]);
+ kb_Ylm_[2][mindx(2,-2)]= conj(kb_Ylm_[2][mindx(2,2)]);
+ for(int im=0; im<2 ; im++){
+   kb_dYlm_[im][2][mindx(2,-1)]=-conj(kb_dYlm_[im][2][mindx(2,1)]);
+   kb_dYlm_[im][2][mindx(2,-2)]= conj(kb_dYlm_[im][2][mindx(2,2)]);
+ }
+ if(lmax_global==2) return;
+ //
+ ch=sqrt(  7.0/(16.0*pi));
+ kb_Ylm_[3][mindx(3,0)]= ch*(5.0*pow(costh,3)-3.0*costh);
+ kb_dYlm_[0][3][mindx(3,0)]=-ch*sinth*(15.0*costh*costh-3.0);
+ kb_dYlm_[1][3][mindx(3,0)]= cZERO;
+ ch=sqrt( 21.0/(64.0*pi));
+ kb_Ylm_[3][mindx(3,1)]=-ch*sinth*( 5.0*costh*costh -1.0)*eiphi;
+ kb_dYlm_[0][3][mindx(3,1)]=-ch*(15.0*pow(costh,3)-11.0*costh)*eiphi;
+ kb_dYlm_[1][3][mindx(3,1)]=-ch*sinth*( 5.0*costh*costh -1.0)*eiphi*cI;
+ ch=sqrt(105.0/(32.0*pi));
+ kb_Ylm_[3][mindx(3,2)]= ch*sinth*sinth * costh*eiphi*eiphi;
+ kb_dYlm_[0][3][mindx(3,2)]= ch*(2.0*sinth*costh*costh-pow(sinth,3))*eiphi*eiphi;
+ kb_dYlm_[1][3][mindx(3,2)]= ch* 2.0*sinth*sinth*costh*eiphi*eiphi*cI;
+ ch=sqrt( 35.0/(64.0*pi));
+ kb_Ylm_[3][mindx(3,3)]=-ch*pow(sinth,3)*pow(eiphi,3);
+ kb_dYlm_[0][3][mindx(3,3)]=-ch*3.0*sinth*sinth*costh*pow(eiphi,3);
+ kb_dYlm_[1][3][mindx(3,3)]=-ch*3.0*pow(sinth,3)*pow(eiphi,3)*cI;
+ // M < 0
+ kb_Ylm_[3][mindx(3,-1)]=-conj(kb_Ylm_[3][mindx(3,1)]);
+ kb_Ylm_[3][mindx(3,-2)]= conj(kb_Ylm_[3][mindx(3,2)]);
+ kb_Ylm_[3][mindx(3,-3)]=-conj(kb_Ylm_[3][mindx(3,3)]);
+ for(int im=0; im<2 ; im++){
+   kb_dYlm_[im][3][mindx(3,-1)]=-conj(kb_dYlm_[im][3][mindx(3,1)]);
+   kb_dYlm_[im][3][mindx(3,-2)]= conj(kb_dYlm_[im][3][mindx(3,2)]);
+   kb_dYlm_[im][3][mindx(3,-3)]=-conj(kb_dYlm_[im][3][mindx(3,3)]);
+ }
+ if(lmax_global == 3) return;
+
+}
+
+
+
+bool NonLocalPotential::rVnl_kbv() {
+
+    bool pp_kbv_calculated= false;
+ //   if(!compute_rVnl) return pp_kb_calculated;
+
+
+  const int ngpw = basis_.localsize();
+  //const int mloc = basis_.maxlocalsize();
+//  const int mloc = sd.c().mloc();
+  // define atom block size
+  const double pi = M_PI;
+  const double omega = basis_.cell().volume();
+  assert(omega != 0.0);
+  const double omega_inv = 1.0 / omega;
+  vector<vector<double> > tau;
+  atoms_.get_positions(tau,true);
+
+//  cout << "ONCV " << tau[0][3] << " " << omega << endl;
+  const double *kpg   = basis_.kpg_ptr();
+  const double *kpg2  = basis_.kpg2_ptr();
+  const double *kpgi  = basis_.kpgi_ptr();
+  const double *kpg_x = basis_.kpgx_ptr(0);
+  const double *kpg_y = basis_.kpgx_ptr(1);
+  const double *kpg_z = basis_.kpgx_ptr(2);
+  const double *gcc_x = basis_.gx_ptr(0);
+  const double *gcc_y = basis_.gx_ptr(1);
+  const double *gcc_z = basis_.gx_ptr(2);
+
+  if(vp){
+    kpg = vp->get_kpgpa(basis_);
+    kpg2 = vp->get_kpgpa2(basis_);
+    kpgi = vp->get_kpgpai(basis_);
+    kpg_x = vp->get_kpgpax(basis_, 0);
+    kpg_y = vp->get_kpgpax(basis_, 1);
+    kpg_z = vp->get_kpgpax(basis_, 2);
+  }
+
+
+ // double rho_rVnl=0.0;
+  double sf  = 1.0;  // temproray it is 1.0 for spin-unpolarized systems.
+  double kb_temp,kbd_temp;
+  double G_dot_Rat;
+  complex<double> e_iGR;
+  complex<double> kb_Ylm[4];
+
+// recalculate pp_kbv_dim, since upf may have nproj /=2, such as F.upf
+  int i_pp_dim=0;
+  if(!pp_dim_checked){
+  //int i_pp_dim=0;
+  for ( int is = 0; is < nsp; is++ ) {
+    Species *s = atoms_.species_list[is];
+    for(int l=0; l< lmax[is]+1; l++)  {
+      for (int ichan=0; ichan< s->nchannels_l(l); ichan++) {
+        i_pp_dim += (2*l+1)*na[is];
+      }
+    }
+  }
+
+//  bool pp_dim_checked = false;
+//  assert(i_pp_dimpp_kbv_dim);
+  if(i_pp_dim==pp_kbv_dim){
+    if(ctxt_.mype()==0) cout << "pp_kbv_dim is good!!" << endl;
+  }
+  else{
+    pp_kbv_dim=i_pp_dim;
+    if(ctxt_.mype()==0) cout << "default pp_kbv_dim is larger, reset to: " << pp_kbv_dim << endl;
+  }
+  pp_dim_checked = true;}
+  i_pp_dim=0;
+
+  pp_kbv.resize(pp_kbv_dim);  // number  fo spieces of pp_kbv
+  for(int i_pp=0; i_pp < pp_kbv_dim; i_pp++){
+      pp_kbv[i_pp].resize(4);
+      for(int indx_pp=0; indx_pp<4; indx_pp++) pp_kbv[i_pp][indx_pp].resize(ngpw);
+  }
+
+  for (int ig=0; ig<ngpw; ig++) {
+
+    pp_kb_ylm( kpg_x[ig], kpg_y[ig], kpg_z[ig]);
+
+    i_pp_dim = 0;
+    for ( int is = 0; is < nsp; is++ ) {
+      Species *s = atoms_.species_list[is];
+
+      vector<vector<double>>  pp_kb, pp_kbd, pp_kbs;
+      pp_kb.resize(lmax[is]+1);
+      pp_kbs.resize(lmax[is]+1);
+      pp_kbd.resize(lmax[is]+1);
+
+      for(int l=0; l< lmax[is]+1; l++)  {
+        pp_kb[l].resize(s->nchannels_l(l));
+        pp_kbs[l].resize(s->nchannels_l(l));
+        pp_kbd[l].resize(s->nchannels_l(l));
+
+        for (int ichan=0; ichan< s->nchannels_l(l); ichan++){
+
+           if(fabs(kpg[ig])< 1.0E-7)
+           { pp_kb[l][ichan] = 0.0; pp_kbd[l][ichan]=0.0;
+           }
+           else{
+             s->dvnlg(l, ichan, kpg[ig], kb_temp, kbd_temp);
+             pp_kb[l][ichan]  =  kb_temp*sqrt(fabs((s->wsg(l, ichan))*omega_inv));
+             pp_kbd[l][ichan] = kbd_temp*sqrt(fabs((s->wsg(l, ichan))*omega_inv));
+           }
+
+          if(fabs(s->wsg(l, ichan)) < 1.0E-7){
+            pp_kbs[l][ichan] = 0.0;
+          }
+          else{
+          pp_kbs[l][ichan] = (s->wsg(l, ichan))/fabs(s->wsg(l, ichan));
+          }
+//          sf=sqrt(4.0*pi/(2.0*l+1.0));
+        }
+      }
+
+      for(int iatom=0; iatom< na[is]; iatom++){
+
+        tmap["comp_eigr"].start();
+//  if(vp) kpgx = vp->get_kpgpax(basis_, 0);
+        double kpgr_x;
+        double kpgr_y;
+        double kpgr_z;
+
+        kpgr_x = tau[is][3*iatom+0]*kpg_x[ig];
+        kpgr_y = tau[is][3*iatom+1]*kpg_y[ig];
+        kpgr_z = tau[is][3*iatom+2]*kpg_z[ig];
+
+        G_dot_Rat = kpgr_x + kpgr_y + kpgr_z;
+        e_iGR.real(cos(G_dot_Rat));
+        e_iGR.imag(sin(G_dot_Rat));
+
+        tmap["comp_eigr"].stop();
+
+        for(int l=0; l< lmax[is]+1; l++)  {
+
+          for (int ichan=0; ichan< s->nchannels_l(l); ichan++){
+
+          for(int im=0; im<2*l+1; im++){
+
+            kb_Ylm[0]=kb_Ylm_[l][im];
+            kb_Ylm[1]=kb_dYlm_[0][l][im]*kb_Ylm_grad_[0][0]+kb_dYlm_[1][l][ im ]*kb_Ylm_grad_[1][0];
+            kb_Ylm[2]=kb_dYlm_[0][l][im]*kb_Ylm_grad_[0][1]+kb_dYlm_[1][l][ im ]*kb_Ylm_grad_[1][1];
+            kb_Ylm[3]=kb_dYlm_[0][l][im]*kb_Ylm_grad_[0][2]+kb_dYlm_[1][l][ im ]*kb_Ylm_grad_[1][2];
+      for(int ipp=0; ipp<4; ipp++)       kb_Ylm[ipp]=conj(kb_Ylm[ipp]);
+
+
+              pp_kbv[i_pp_dim][0][ig]=kb_Ylm[0]*pp_kb[l][ichan]*pp_kbs[l][ichan]*e_iGR*sf;
+              pp_kbv[i_pp_dim][1][ig]=(kb_Ylm[0]*kpg_x[ig]*kpgi[ig]*pp_kbd[l][ichan] + kb_Ylm[1]*pp_kb[l][ichan])*e_iGR*sf;
+              pp_kbv[i_pp_dim][2][ig]=(kb_Ylm[0]*kpg_y[ig]*kpgi[ig]*pp_kbd[l][ichan] + kb_Ylm[2]*pp_kb[l][ichan])*e_iGR*sf;
+              pp_kbv[i_pp_dim][3][ig]=(kb_Ylm[0]*kpg_z[ig]*kpgi[ig]*pp_kbd[l][ichan] + kb_Ylm[3]*pp_kb[l][ichan])*e_iGR*sf;
+
+        	i_pp_dim =  i_pp_dim +1;
+            } // channel
+          }  // m
+        }  // l
+      } // iatom
+    }  // is
+  } // ig
+
+  if(vp){
+    delete [] kpg ;
+    delete [] kpg2 ;
+    delete [] kpgi ;
+    delete [] kpg_x ;
+    delete [] kpg_y ;
+    delete [] kpg_z ;
+  }
+
+//   cout << "pp_kbv_dim: " << i_pp_dim << endl;
+  pp_kbv_calculated= true;
+  return pp_kbv_calculated;
+
+}
+
+D3vector NonLocalPotential::update_rVnl_sum(SlaterDet& sd, bool compute_rVnl){
+
+//  if(!compute_rVnl) return (0.0,0.0);
+  const double omega = basis_.cell().volume();
+  complex<double> cZERO = complex<double>(0.0,0.0);
+  complex<double> cONE = complex<double>(1.0,0.0);  
+  valarray<valarray<complex<double>>> drho_dir;
+  valarray<complex<double>> drho, drho_global, rVnl;
+
+  const ComplexMatrix& c = sd.c();
+  const int nstloc = sd.nstloc();
+  const complex<double>* p = c.cvalptr();
+  const int mloc = c.mloc();
+  const int nbands = c.nloc();
+  const int ngwloc = basis_.localsize();
+  const double * const occ = sd.occ_ptr();
+
+/// new using MPI, but more memory cost
+    drho_dir.resize(4);
+    rVnl.resize(4, cZERO);
+    for (int ipp=0; ipp< pp_kbv_dim; ipp++ ){
+
+    	for (int idir=0; idir < 4; idir++) {
+	    drho_global.resize(nbands,cZERO);
+//	    drho.resize(nbands,cZERO);
+	    drho_dir[idir].resize(nbands);
+
+          drho.resize(nbands,cZERO);
+	    for ( int lj=0; lj < c.nblocks(); lj++ )
+              {
+                 for ( int jj=0; jj < c.nbs(lj); jj++ )
+                 {
+                    // global state index
+                    const int nglobal = c.j(lj,jj);
+                    const int norig = lj*c.nb()+jj;
+                    for ( int ig = 0; ig < ngwloc; ig++ )
+                    {
+                       const complex<double> pval = p[ig+norig*mloc];
+                       drho[nglobal] += pval*pp_kbv[ipp][idir][ig];
+                    }
+	//	    MPI_Barrier(MPI_COMM_WORLD);
+                 }
+              }
+//       MPI_Barrier(MPI_COMM_WORLD);
+      if (nstloc>0){
+      MPI_Comm basis_comm = basis_.context().comm();
+//      MPI_Barrier(basis_comm);
+      int drho_size = nbands;
+      MPI_Allreduce(&drho[0], &drho_global[0], drho_size, MPI_DOUBLE_COMPLEX,MPI_SUM,basis_comm);
+      drho_dir[idir] = drho_global;
+      }  
+    }
+
+    for (int idir=0; idir < 3; idir++){
+	for(int ib=0; ib< nbands ; ib++) {
+      rVnl[idir] +=occ[ib]*(conj(drho_dir[0][ib])*drho_dir[1+idir][ib] + conj(drho_dir[1+idir][ib])*drho_dir[0][ib]);
+    }
+  }
+
+}
+
+// delete [] &drho_dir;
+// delete [] &drho_global;
+// delete [] &drho;
+ return  D3vector( real(rVnl[0]), real(rVnl[1]) ,real(rVnl[2]));
+//  return;
+}

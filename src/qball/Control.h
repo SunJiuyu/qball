@@ -90,6 +90,11 @@ struct Control
 
   double dt;
   double tddt; // AS: time step for the wave function propagation
+  double lrc_alpha;
+  double lrc_alda;
+  int TDM_steps;
+  int TDM_nr_plot;
+  int TDM_nR_plot;
   int na_overlap_min; // AS: minimum band index for the calculation of non-adiabatic overlaps
   int na_overlap_max; // AS: maximum band index for the calculation of non-adiabatic overlaps
   int iprint;
@@ -141,7 +146,10 @@ struct Control
   double fcp_mu;
 
   VectorPotential::Dynamics vector_potential_dynamics;
-  D3vector initial_vector_potential;
+  D3vector initial_vp_ext;
+  D3vector initial_vp_ind;
+  D3vector initial_vp_v;
+  D3vector initial_vp_acc;
   double laser_freq;
   D3vector laser_amp;
 

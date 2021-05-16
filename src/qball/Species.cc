@@ -376,6 +376,9 @@ bool Species::initialize(double rcpsval)
 	  wsg_[l][ic] = dij_[l][ic][ic];
 	  for (int ip = 0; ip < ndft_; ip++) vnlr[l][ic][ip] = fpi*deltar_*projectors_[l][ic][ip];
 	}
+//         if (ctxt_.oncoutpe())
+//           cout << "<!-- Kleinman-Bylander normalization term wsg[" << l << "] = " << wsg_[l][0] << " -->" << endl;
+//           cout << "<!-- Kleinman-Bylander normalization term wsg[" << l << "] = " << wsg_[l][1] << " -->" << endl;
       }
       
     }

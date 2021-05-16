@@ -28,8 +28,8 @@
 
 #include <config.h>
 
-#ifndef VECTORPOTENTIALVAR_H
-#define VECTORPOTENTIALVAR_H
+#ifndef VECTORPOTENTIAL_EXT_H
+#define VECTORPOTENTIAL_EXT_H
 
 #include <iostream>
 #include <iomanip>
@@ -38,23 +38,23 @@
 
 #include <qball/Sample.h>
 
-class VectorPotentialVar : public Var
+class VectorPotential_ext : public Var
 {
   Sample *s;
 
   public:
 
-  char const*name ( void ) const { return "vector_potential"; };
+  char const*name ( void ) const { return "vector_potential_external"; };
   
   int set ( int argc, char **argv ) {
     if ( argc != 4 ) {
-      ui->error("vector_potential must be specified as a vector with 3 values");
+      ui->error("vector_potential_external must be specified as a vector with 3 values");
       return 1;
     }
     
     D3vector v(atof(argv[1]), atof(argv[2]), atof(argv[3]));
     
-    s->ctrl.initial_vector_potential = v;
+    s->ctrl.initial_vp_ext = v;
     return 0;
   }
   
@@ -64,11 +64,11 @@ class VectorPotentialVar : public Var
     st.setf(ios::left,ios::adjustfield);
     st << setw(10) << name() << " = ";
     st.setf(ios::right,ios::adjustfield);
-    st << setw(10) << s->ctrl.initial_vector_potential;
+    st << setw(10) << s->ctrl.initial_vp_ext;
     return st.str();
   }
   
-  VectorPotentialVar(Sample *sample) : s(sample) { s->ctrl.initial_vector_potential = D3vector(0.0, 0.0, 0.0); }
+  VectorPotential_ext(Sample *sample) : s(sample) { s->ctrl.initial_vp_ext = D3vector(0.0, 0.0, 0.0); }
 
 };
 

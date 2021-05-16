@@ -37,6 +37,7 @@
 #include "Context.h"
 #include "VectorPotential.h"
 #include <math/matrix.h>
+#include <math/d3vector.h>
 
 class StructureFactor;
 
@@ -79,6 +80,20 @@ class NonLocalPotential
   void init(const bool compute_stress);
 
   VectorPotential * vp;
+
+  vector<vector<complex<double>>> kb_Ylm_;
+  vector<vector<vector<complex<double>>>> kb_dYlm_;
+  vector<vector<double>> kb_Ylm_grad_;
+ // int lindx(int l);
+  int mindx(int l, int m);
+  void pp_kb_ylm(double gx, double gy, double gz);  // spherical harmonics and its derivatives  
+  int pp_kbv_dim;  // nsp*natoms*npr
+  bool pp_dim_checked;
+  vector<vector<vector<complex<double>>>> pp_kbv;  
+  int                     lmax_global;  // lmax for all atom
+  // pp_kbv[is][iatom][ipr][indx][ipw]
+  //non-local commutator temp, no dimension for spin; only for spin-unpolarized currently --Jiuyu
+
   
   public:
   
@@ -94,6 +109,10 @@ class NonLocalPotential
     bool compute_forces, vector<vector<double> >& fion, 
     bool compute_stress, valarray<double>& sigma_enl,
     vector<complex<double> >& veff);
+
+   bool rVnl_kbv();
+//  vector<vector<complex<double>>> rho_rVnl;
+  D3vector update_rVnl_sum(SlaterDet& sd, bool compute_rVnl);
 
   void print_memory(ostream&os, int kmult, int kmultloc, double& totsum, double& locsum) const;
   void print_timing();

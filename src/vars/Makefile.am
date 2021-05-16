@@ -37,9 +37,11 @@ noinst_HEADERS =                            \
 	HugFreq.h                           \
 	HugoniostatVar.h                    \
 	IPrint.h                            \
-        LaserFreq.h                         \
-        LaserAmp.h                          \
-        LaserEnvelope.h                     \
+    LRC_alpha.h 			 		    \
+	LRC_alda.h		 	    	   	  \
+    LaserFreq.h                         \
+    LaserAmp.h                          \
+    LaserEnvelope.h                     \
 	MatrixLoc.h                         \
 	MDIter.h                            \
 	Memory.h                            \
@@ -62,6 +64,8 @@ noinst_HEADERS =                            \
 	StandardVar.h                       \
 	Stress.h                            \
 	TDDt.h                              \
+	TDMBox.h 							\
+	TDMSteps.h 							\
 	Thermostat.h                        \
 	ThresholdForce.h                    \
 	ThresholdScf.h                      \
@@ -70,7 +74,10 @@ noinst_HEADERS =                            \
 	ThTime.h                            \
 	ThWidth.h                           \
 	VectorPotentialDynamics.h           \
-	VectorPotentialVar.h                \
+	VectorPotential_ext.h                \
+	VectorPotential_ind.h                \
+	VectorPotential_v.h                \	
+	VectorPotential_acc.h                \
 	VdW.h                               \
 	WfDiag.h                            \
 	WfDyn.h                             \

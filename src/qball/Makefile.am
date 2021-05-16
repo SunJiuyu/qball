@@ -97,6 +97,7 @@ noinst_HEADERS =                            \
 	Symmetry.h                          \
 	SymmetrySet.h                       \
 	TDEULERWavefunctionStepper.h        \
+	TDTDM.h 							\
 	Timer.h                             \
 	TorsionConstraint.h                 \
 	Unit.h                              \
@@ -177,7 +178,9 @@ libqbLink_a_SOURCES =                        \
 	SORKTDWavefunctionStepper.cc         \
 	FORKTDWavefunctionStepper.cc         \
 	TDEULERWavefunctionStepper.cc        \
+	TDTDM.cc 							 \
 	EhrenSampleStepper.cc                \
+	VectorPotential.cc                   \
 	FCPStepper.cc                        \
 	ExponentialWavefunctionStepper.cc    \
 	SelfConsistentPotential.cc           \

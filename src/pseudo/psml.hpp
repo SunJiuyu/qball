@@ -188,6 +188,20 @@ namespace pseudopotential {
       }
       return nc;
     }
+
+    int nchannels_l(int l) const {
+      if(type_ == pseudopotential::type::SEMILOCAL) return 1;
+      int nc = 0;
+      rapidxml::xml_node<> * node = root_node_->first_node("nonlocal-projectors");
+      assert(node);
+      node = node->first_node("proj");
+      while(node){
+  int read_ic = value<int>(node->first_attribute("seq")) - 1;
+  nc = std::max(nc, read_ic + 1);
+  node = node->next_sibling("proj");
+      }
+      return nc;
+    }    
     
     void local_potential(std::vector<double> & val) const {
       read_function(root_node_->first_node("local-potential"), val, true);

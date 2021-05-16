@@ -44,6 +44,7 @@
 
 #include "Timer.h"
 #include <math/blas.h>
+#include <math/d3vector.h>
 
 #include <iostream>
 #include <iomanip>
@@ -125,15 +126,22 @@ EnergyFunctional::EnergyFunctional(const Sample& s, const Wavefunction& wf, Char
      update_hamiltonian();
 
      // AS: the charge density based on hamil_wf has to be used
-     xcp = new XCPotential((*hamil_cd_),s_.ctrl.xc,cd_);
+     xcp = new XCPotential((*hamil_cd_),s_.ctrl.xc,cd_,s.ctrl.lrc_alda);
+
+     (xcp->vxc0).resize(wf_.nspin());  // JY: initialize storing xc0
+     for ( int ispin = 0; ispin < wf_.nspin(); ispin++ ) {
+        (xcp->vxc0[ispin]).resize(vft->np012loc());
+        for (int i=0; i<vft->np012loc(); i++)
+          xcp->vxc0[ispin][i] = 0.0;
+     }
   }
   else
   {
      xcp = new XCPotential(cd_,s_.ctrl.xc);
   }
 
-  if(s.ctrl.vector_potential_dynamics != VectorPotential::Dynamics::NONE || norm(s.ctrl.initial_vector_potential) > 1e-15 || norm(s.ctrl.laser_amp) > 1e-15) {
-    vp = new VectorPotential(s.ctrl.vector_potential_dynamics, s.ctrl.initial_vector_potential, s.ctrl.laser_freq, s.ctrl.laser_amp, s.ctrl.envelope_type,s.ctrl.envelope_center,s.ctrl.envelope_width);
+  if(s.ctrl.vector_potential_dynamics != VectorPotential::Dynamics::NONE || norm(s.ctrl.initial_vp_ext) > 1e-15 || norm(s.ctrl.laser_amp) > 1e-15) {
+    vp = new VectorPotential(s.ctrl.vector_potential_dynamics, s.ctrl.initial_vp_ext, s.ctrl.initial_vp_ind,s.ctrl.initial_vp_v,s.ctrl.initial_vp_acc,s.ctrl.laser_freq, s.ctrl.laser_amp, s.ctrl.envelope_type,s.ctrl.envelope_center,s.ctrl.envelope_width, s.ctrl.lrc_alpha);
   }
  
   nlp.resize(wf_.nspin());
@@ -2127,7 +2135,38 @@ void EnergyFunctional::print(ostream& os) const
   os << "  <etotal> " << setw(15) << etotal() << " </etotal>\n"
      << flush;
 }
-  
+ 
+
+void EnergyFunctional::update_nonlocal_commutator(Wavefunction& psi, bool compute_rVnl)
+{
+  if(!compute_rVnl) return;
+  bool nlp_ok=true;
+
+  psp_current_=D3vector(0.0, 0.0, 0.0);
+  D3vector commu=D3vector(0.0, 0.0, 0.0);
+ // complex<double> psp_current=complex<double>(0.0,0.0);
+
+  for ( int ispin = 0; ispin < psi.nspin(); ispin++ ) {
+    if (psi.spinactive(ispin)) {
+      for (int ikp=0; ikp<psi.nkptloc(); ikp++) {
+
+        //double wt = dwf.weight(dwf.kptloc(ikp));
+
+        nlp_ok = nlp_ok&&nlp[ispin][ikp]->rVnl_kbv();
+//	if(s_.ctxt_.mype()==0) cout << "pp_kbv: " << nlp_ok << endl;
+	
+        commu = nlp[ispin][ikp]->update_rVnl_sum(*psi.sd(ispin, ikp), true);
+	      psp_current_ += commu/psi.nkp();
+      }
+    }
+  }
+
+  psi.wfcontext()->dsum('r',3,1,&psp_current_[0],3);
+
+   if(s_.ctxt_.mype()==0) cout << "  psp_current:\t" << psp_current_[0] << '\t' << psp_current_[1] << '\t' << psp_current_[2] << endl;
+  return;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 void EnergyFunctional::print_memory(ostream&os, double& totsum, double& locsum) const
 {
